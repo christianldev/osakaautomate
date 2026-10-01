@@ -3,10 +3,115 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:osakaautomate"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="Osaka Automate" Height="720" Width="1180" MinHeight="600" MinWidth="960"
+        FontFamily="Segoe UI Variable Display" Background="#FFF4F7F8">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Style x:Key="ActionButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Height" Value="46" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="15,0" />
+        </Style>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#FFE7EEEF" />
+            <Setter Property="Foreground" Value="#FF264442" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Height" Value="42" />
+            <Setter Property="BorderBrush" Value="#FFD4DFDF" />
+        </Style>
+    </Window.Resources>
     <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="252" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
+        <Border Grid.Column="0" Background="#FF143C3A" Padding="20">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Top">
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,32">
+                        <Border Width="36" Height="36" Background="#FFF06E4F" CornerRadius="6" Margin="0,0,10,0">
+                            <materialDesign:PackIcon Kind="Calculator" Width="22" Height="22" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Osaka" Foreground="White" FontSize="19" FontWeight="SemiBold" />
+                            <TextBlock Text="Comisiones" Foreground="#FFBBD0CD" FontSize="12" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <Button Style="{StaticResource ActionButton}" Command="{Binding CargarPagosCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="FileExcel" Width="20" Height="20" Margin="0,0,12,0" />
+                            <TextBlock Text="Cargar pagos" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource ActionButton}" Command="{Binding CargarPdfsCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="FolderOpen" Width="20" Height="20" Margin="0,0,12,0" />
+                            <TextBlock Text="Cargar facturas" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource ActionButton}" Command="{Binding CalcularCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="CalculatorVariant" Width="20" Height="20" Margin="0,0,12,0" />
+                            <TextBlock Text="Calcular" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource ActionButton}" Command="{Binding ExportarExcelCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="FileExportOutline" Width="20" Height="20" Margin="0,0,12,0" />
+                            <TextBlock Text="Exportar Excel" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Bottom">
+                    <ProgressBar Height="3" IsIndeterminate="True"
+                                 Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                 Foreground="#FFF06E4F" Margin="0,0,0,14" />
+                    <TextBlock Text="{Binding Estado}" Foreground="#FFBBD0CD" FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Column="1" Margin="32,28,32,28">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="18" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Comisiones calculadas" FontSize="25" FontWeight="SemiBold" Foreground="#FF1E3433" />
+                    <TextBlock Text="Resultados de facturas pagadas" FontSize="13" Foreground="#FF5B7070" Margin="0,5,0,0" />
+                </StackPanel>
+                <Border Grid.Column="1" Background="#FFDCECE8" CornerRadius="5" Padding="12,7" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding FacturasProcesadas.Count, StringFormat={}{0} registros}" Foreground="#FF206457" FontWeight="SemiBold" />
+                </Border>
+            </Grid>
+
+            <Border Grid.Row="2" Background="White" BorderBrush="#FFD9E3E3" BorderThickness="1" CornerRadius="6">
+                <DataGrid ItemsSource="{Binding FacturasProcesadas}" IsReadOnly="True" AutoGenerateColumns="False"
+                          CanUserAddRows="False" CanUserDeleteRows="False" CanUserReorderColumns="False"
+                          GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#FFE7EEEE"
+                          BorderThickness="0" RowHeight="46" HeadersVisibility="Column">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Factura" Binding="{Binding NumeroFactura}" Width="1.1*" />
+                        <DataGridTextColumn Header="Vendedor" Binding="{Binding Vendedor.Nombre}" Width="2*" />
+                        <DataGridTextColumn Header="Subtotal" Binding="{Binding Subtotal, StringFormat={}{0:C2}}" Width="1*" />
+                        <DataGridTextColumn Header="Comisión" Binding="{Binding MontoComision, StringFormat={}{0:C2}}" Width="1*" />
+                        <DataGridTextColumn Header="Estado" Binding="{Binding Estado}" Width="0.9*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

@@ -51,7 +51,13 @@ public class MainViewModel : BaseViewModel
     public bool IsBusy
     {
         get => _isBusy;
-        private set => SetProperty(ref _isBusy, value);
+        private set
+        {
+            if (SetProperty(ref _isBusy, value))
+            {
+                ActualizarComandos();
+            }
+        }
     }
 
     public string Estado
