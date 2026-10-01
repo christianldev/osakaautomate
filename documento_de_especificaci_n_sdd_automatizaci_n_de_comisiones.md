@@ -1,74 +1,81 @@
-# Spec-Driven Development (SDD): Sistema Automatizado de Comisiones (WPF)
+# Especificación de Diseño de Software (SDD)
+## Proyecto: Sistema de Automatización de Comisiones
+## Plataforma: .NET WPF (C#)
+## Arquitectura: MVVM (Model-View-ViewModel)
 
-## 1. Visión General del Proyecto
-**Descripción:** Aplicación de escritorio orientada a automatizar la lectura de facturas de venta en formato PDF y el cálculo automático de comisiones para vendedores, utilizando reglas de negocio dinámicas.
-**Plataforma:** Windows Desktop.
-**Patrón Arquitectónico:** MVVM (Model-View-ViewModel).
+---
 
-## 2. Stack Tecnológico
-*   **Lenguaje:** C# (.NET 8 o superior)
-*   **Framework UI:** WPF (Windows Presentation Foundation)
-*   **Diseño UI:** MaterialDesignThemes (NuGet)
-*   **Arquitectura:** CommunityToolkit.Mvvm (para comandos y bindings eficientes)
-*   **Base de Datos:** SQLite usando Entity Framework Core (`Microsoft.EntityFrameworkCore.Sqlite`)
-*   **OCR / IA:** `Azure.AI.DocumentIntelligence` (Modelo preconstruido de facturas)
-*   **Exportación:** `ClosedXML` (para generación de reportes en Excel)
+### 1. Descripción General del Sistema
+Aplicación de escritorio local desarrollada en WPF y C# para automatizar el cálculo de comisiones por ventas. El sistema reemplaza un proceso manual cruzando datos de dos fuentes: un reporte de pagos en Excel y las facturas originales en PDF. Finalmente, calcula las comisiones según reglas de negocio predefinidas y exporta los resultados inyectándolos en una plantilla de Excel existente, preservando sus fórmulas.
 
-## 3. Modelos de Dominio (Data Models)
-El agente de IA deberá generar las entidades de Entity Framework Core basadas en la siguiente estructura:
+### 2. Stack Tecnológico (Paquetes NuGet Requeridos)
+*   **UI y Presentación:** `MaterialDesignThemes` (UI Moderna).
+*   **Acceso a Datos:** `Microsoft.EntityFrameworkCore.Sqlite`, `Microsoft.EntityFrameworkCore.Tools` (SQLite local).
+*   **Lectura y Extracción OCR:** `Azure.AI.DocumentIntelligence` (Capa gratuita F0) o `Tesseract` + `UglyToad.PdfPig` (Alternativa local).
+*   **Manipulación de Excel:** `ClosedXML` (Para leer el reporte de pagos y escribir en la plantilla final).
 
-*   **Vendedor (Seller):**
-    *   `Id` (int, PK)
-    *   `Nombre` (string)
-    *   `Tipo` (string - ej: Junior, Senior)
+---
 
-*   **ReglaComision (CommissionRule):**
-    *   `Id` (int, PK)
-    *   `TipoVendedor` (string)
-    *   `RangoMinimo` (decimal)
-    *   `RangoMaximo` (decimal)
-    *   `Porcentaje` (decimal - ej: 0.05 para 5%)
+### 3. Modelos de Datos (Entity Framework Core)
 
-*   **FacturaProcesada (ProcessedInvoice):**
-    *   `Id` (int, PK)
-    *   `NumeroFactura` (string)
-    *   `VendedorId` (int, FK)
-    *   `Fecha` (DateTime)
-    *   `Subtotal` (decimal)
-    *   `ComisionCalculada` (decimal)
-    *   `Estado` (string - "Éxito", "Requiere Revisión")
+**Vendedor.cs**
+*   `Id` (int, PK)
+*   `Nombre` (string, max 100)
+*   `Nivel` (string, max 50) - Ej: Junior, Senior
 
-## 4. Interfaces de Servicios (Contracts)
-El sistema debe estar desacoplado usando Inyección de Dependencias. Se requieren las siguientes interfaces:
+**ReglaComision.cs**
+*   `Id` (int, PK)
+*   `NivelVendedor` (string, match con Vendedor.Nivel)
+*   `TipoProducto` (string)
+*   `RangoVentaMinimo` (decimal)
+*   `RangoVentaMaximo` (decimal)
+*   `PorcentajeComision` (decimal)
 
-*   `IOcrService`: Responsable de recibir la ruta de un PDF y devolver los datos extraídos.
-    *   `Task<InvoiceExtractionResult> ExtractDataAsync(string pdfPath);`
-*   `ICommissionEngine`: Responsable de aplicar las reglas de negocio sobre los datos extraídos.
-    *   `Task<decimal> CalculateCommissionAsync(decimal subtotal, string tipoVendedor);`
-*   `IExportService`: Responsable de generar el archivo de salida.
-    *   `Task ExportToExcelAsync(IEnumerable<FacturaProcesada> records, string destinationPath);`
+**FacturaProcesada.cs** (Transaccional)
+*   `Id` (int, PK)
+*   `NumeroFactura` (string)
+*   `VendedorId` (int, FK)
+*   `Subtotal` (decimal)
+*   `MontoComision` (decimal)
+*   `Estado` (string) - Ej: "Pagada", "Pendiente"
 
-## 5. Flujo de Usuario y UI (Views & ViewModels)
+---
 
-### View 1: Dashboard (Procesamiento)
-*   **UI:** Zona de "Drag and Drop" para soltar archivos PDF, botón "Procesar", y un `DataGrid` para ver resultados en tiempo real.
-*   **ViewModel (`DashboardViewModel`):**
-    *   `ObservableCollection<FacturaProcesada> Facturas`
-    *   `RelayCommand ProcesarFacturasCommand`
-    *   **Lógica:** Al activar el comando, iterar sobre los PDFs de forma asíncrona (`Task.WhenAll` para concurrencia limitada), llamar a `IOcrService`, luego a `ICommissionEngine`, y actualizar la UI mediante el hilo principal de WPF (Dispatcher).
+### 4. Flujo de Ejecución y Reglas de Negocio
 
-### View 2: Configuración (Reglas de Negocio)
-*   **UI:** `DataGrid` editable para administrar los porcentajes, rangos de venta y categorías de vendedores.
-*   **ViewModel (`SettingsViewModel`):**
-    *   CRUD completo conectado a Entity Framework Core (SQLite).
+1.  **Ingesta de Pagos (Excel):** El usuario carga el archivo Excel de pagos. El sistema lee una columna específica y utiliza Expresiones Regulares (RegEx) para extraer el número de factura oculto dentro de cadenas de texto (ej. "Pago de FAC-1234").
+2.  **Lectura OCR (PDFs):** El usuario selecciona la carpeta con las facturas en PDF. El sistema extrae el número de factura, nombre del vendedor y subtotal usando Azure Document Intelligence.
+3.  **Cruce de Datos (Matching):** El sistema realiza un `Join` en memoria. Solo se calculan las comisiones de las facturas en PDF cuyo número extraído coincida con los números extraídos del Excel de pagos.
+4.  **Cálculo de Comisión:** Para los matches exitosos, el motor cruza el nivel del vendedor y el subtotal contra la tabla `ReglasComision` en la base de datos para obtener el porcentaje aplicable y calcular el monto final.
+5.  **Exportación a Plantilla (Excel):** El sistema abre un archivo `.xlsx` preexistente (plantilla del jefe), inscribe los registros a partir de una fila específica (ej. fila 5) sin alterar las fórmulas adyacentes, y guarda el resultado como un archivo nuevo (ej. `Comisiones_Generadas.xlsx`).
 
-## 6. Casos de Uso Críticos y Manejo de Errores (Edge Cases)
-1.  **Falla del OCR:** Si Azure AI no detecta el subtotal o el nombre, el estado de la factura en el Dashboard debe ser "Requiere Revisión" y el usuario debe poder editar el monto manualmente en la grilla.
-2.  **Timeouts:** Implementar políticas de reintentos (Polly) al llamar a la API de Azure AI Document Intelligence.
-3.  **UI Blocking:** Toda la lógica de procesamiento (OCR, BD, Cálculo) DEBE ejecutarse en hilos secundarios para no congelar la ventana de WPF.
+---
 
-## 7. Criterios de Aceptación para el Agente IA
-1.  El código generado debe compilar sin errores en .NET 8.
-2.  Se debe utilizar Inyección de Dependencias nativa de .NET (ServiceCollection) en `App.xaml.cs`.
-3.  El acceso a datos debe ser asíncrono (`ToListAsync`, `SaveChangesAsync`).
-4.  No se deben incluir las claves de la API de Azure hardcodeadas; deben leerse desde un archivo `appsettings.json`.
+### 5. Definición de Servicios (Interfaces)
+
+*   `ILectorPagosExcelService`: Recibe un `string rutaArchivo`. Utiliza `ClosedXML` y RegEx para devolver un `List<string>` con los números de factura pagados.
+*   `IOCRService`: Recibe un `string rutaPdf`. Retorna un objeto temporal `FacturaDto` con Subtotal, Vendedor y NumeroFactura.
+*   `IMotorCalculoService`: Recibe un `List<string> facturasPagadas` y un `List<FacturaDto> facturasLeidas`. Interactúa con EF Core para evaluar rangos y devuelve un `IEnumerable<FacturaProcesada>`.
+*   `IExportadorPlantillaExcelService`: Recibe el `IEnumerable<FacturaProcesada>` y un `string rutaPlantilla`. Usa `ClosedXML` (`new XLWorkbook(rutaPlantilla)`) para insertar los datos y guarda un nuevo archivo.
+
+---
+
+### 6. Fases de Desarrollo (Prompts para el Agente IA)
+
+**Fase 1: Base de Datos y Entidades**
+> "Implementa la capa de datos. Crea las clases `Vendedor`, `ReglaComision` y `FacturaProcesada` con DataAnnotations. Configura `AppDbContext` heredando de DbContext para usar SQLite. Incluye un método `OnModelCreating` que inyecte datos semilla (Seed Data) de prueba para vendedores y reglas."
+
+**Fase 2: Servicios de Ingesta (Excel y OCR)**
+> "Implementa `ILectorPagosExcelService` usando ClosedXML para leer la columna 'Descripción' de un Excel y extraer números de factura usando RegEx. Luego, implementa `IOCRService` usando Azure.AI.DocumentIntelligence para extraer el Número de Factura, Subtotal y Nombre del Vendedor de un PDF."
+
+**Fase 3: Cruce de Datos y Cálculo**
+> "Implementa `IMotorCalculoService`. Escribe la lógica LINQ que filtre las facturas leídas por el OCR verificando si existen en la lista de facturas pagadas (obtenida del Excel). Para las coincidencias, busca la regla correspondiente en `AppDbContext` basándose en el nivel del vendedor y el monto, calcula la comisión, y devuelve la lista de resultados."
+
+**Fase 4: Inyección en Plantilla Excel**
+> "Implementa `IExportadorPlantillaExcelService`. Usa ClosedXML para abrir un archivo Excel existente a modo de plantilla (`rutaPlantilla`). Inserta la lista de resultados de comisiones iterando a partir de la fila 5, rellenando las columnas 'Factura', 'Vendedor' y 'Comisión'. Guarda el resultado como un archivo nuevo usando `SaveAs`."
+
+**Fase 5: Capa MVVM**
+> "Crea `BaseViewModel` con `INotifyPropertyChanged`. Crea `MainViewModel` con propiedades `ObservableCollection<FacturaProcesada>`, un estado `IsBusy`, y comandos `ICommand` para 'CargarPagos', 'CargarPDFs', 'Calcular' y 'ExportarExcel'. Inyecta las dependencias de los servicios creados en las fases anteriores."
+
+**Fase 6: Interfaz de Usuario (UI)**
+> "Diseña `MainWindow.xaml` utilizando MaterialDesignInXAML. Divide la pantalla en dos secciones: una barra lateral con los botones de acción atados a los comandos del ViewModel, y un área principal con un `DataGrid` de solo lectura atado al `ObservableCollection` para visualizar las comisiones calculadas en tiempo real."
