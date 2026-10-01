@@ -1,0 +1,69 @@
+# ==================================
+# Plantilla .gitignore para .NET/WPF
+# ==================================
+
+# Carpetas de compilación y binarios
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Ll]og/
+[Ll]ogs/
+
+# Archivos de caché y configuración local de Visual Studio
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.rsuser
+
+# Preferencias de usuario (VS Code / Rider / Mono)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.userprefs
+
+# Archivos autogenerados y de resultados de pruebas
+Generated\ Files/
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.VisualState.xml
+TestResult.xml
+nunit-*.xml
+*.msbuild.log
+*.buildlog
+
+# Archivos del sistema operativo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Paquetes NuGet
+*.nupkg
+# La carpeta packages solo se ignora si usas packages.config (proyectos antiguos), 
+# pero es buena práctica mantenerlo por si acaso.
+packages/
+!packages/build/
+# Si usas herramientas locales de .NET
+.netconfig
+
+# Bases de datos locales de desarrollo (SQLite / LocalDB)
+*.db
+*.db-shm
+*.db-wal
+*.mdf
+*.ldf
+*.ndf
