@@ -4,5 +4,8 @@ namespace osakaautomate.Services;
 
 public interface IExportadorPlantillaExcelService
 {
-    string ExportarComisiones(IEnumerable<ComisionReporteDto> comisiones, string rutaArchivo);
+    string ExportarComisiones(
+        IEnumerable<ComisionReporteDto> comisiones,
+        string rutaHistorico,
+        string rutaArchivo);
 }

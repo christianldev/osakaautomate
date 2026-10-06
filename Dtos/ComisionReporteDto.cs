@@ -7,6 +7,7 @@ public class ComisionReporteDto
     public string NumeroFactura { get; set; } = string.Empty;
     public string Vendedor { get; set; } = string.Empty;
     public DateTime FechaFactura { get; set; }
+    public decimal Subtotal { get; set; }
     public decimal VentaBruta { get; set; }
     public decimal Descuento { get; set; }
     public decimal TotalCobrado { get; set; }

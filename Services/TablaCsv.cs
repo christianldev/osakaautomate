@@ -108,6 +108,27 @@ internal static class TablaCsv
 
         throw new InvalidDataException($"La fecha '{value}' de la columna '{columna}' no es válida.");
     }
+
+    public static string NormalizarNombreCliente(string nombre)
+    {
+        var descompuesto = (nombre ?? string.Empty).Trim().Normalize(NormalizationForm.FormD);
+        var resultado = new StringBuilder(descompuesto.Length);
+
+        foreach (var caracter in descompuesto)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(caracter) == UnicodeCategory.NonSpacingMark)
+            {
+                continue;
+            }
+
+            if (char.IsLetterOrDigit(caracter))
+            {
+                resultado.Append(char.ToUpperInvariant(caracter));
+            }
+        }
+
+        return resultado.ToString();
+    }
 }
 
 internal static class NormalizadorNumeroFactura

@@ -13,6 +13,7 @@ public partial class App : Application
 		var viewModel = new MainViewModel(
 			new LectorFacturasCsvService(),
 			new LectorPagosCsvService(),
+			new LectorHistoricoExcelService(),
 			new MotorCalculoService(),
 			new ExportadorPlantillaExcelService());
 		var mainWindow = new MainWindow

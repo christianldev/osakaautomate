@@ -4,7 +4,8 @@ namespace osakaautomate.Services;
 
 public class MotorCalculoService : IMotorCalculoService
 {
-    private const decimal PorcentajeComisionProvisional = 0.03m;
+    private const decimal PorcentajeComisionHasta30Dias = 0.035m;
+    private const decimal PorcentajeComisionMas30Dias = 0.03m;
 
     public IEnumerable<ComisionReporteDto> CalcularComisiones(
         List<FacturaCsvDto> facturas,
@@ -130,12 +131,13 @@ public class MotorCalculoService : IMotorCalculoService
 
     private static ComisionReporteDto CrearResultado(FacturaCsvDto factura, AcumuladoPago pago)
     {
-        var totalFactura = Math.Max(factura.Total, factura.Subtotal + factura.Iva);
-        var totalRecibido = Math.Min(pago.TotalRecibido, totalFactura);
-        var cobroNeto = totalFactura > 0m
-            ? Math.Min(factura.Subtotal, Math.Max(0m, totalRecibido * factura.Subtotal / totalFactura))
-            : 0m;
-        var dias = Math.Max(0, (pago.FechaPago.Date - factura.FechaFactura.Date).Days);
+        var cobroNeto = Math.Max(0m, factura.Subtotal);
+        var dias = Math.Max(0, (int)Math.Round(
+            (pago.FechaPago - factura.FechaFactura.Date).TotalDays,
+            MidpointRounding.AwayFromZero));
+        var porcentajeComision = dias <= 30
+            ? PorcentajeComisionHasta30Dias
+            : PorcentajeComisionMas30Dias;
 
         return new ComisionReporteDto
         {
@@ -144,6 +146,7 @@ public class MotorCalculoService : IMotorCalculoService
             NumeroFactura = factura.NumeroFactura,
             Vendedor = factura.Vendedor,
             FechaFactura = factura.FechaFactura,
+            Subtotal = factura.Subtotal,
             VentaBruta = factura.Subtotal + factura.Descuento,
             Descuento = factura.Descuento,
             TotalCobrado = pago.TotalCobrado,
@@ -151,8 +154,8 @@ public class MotorCalculoService : IMotorCalculoService
             FechaPago = pago.FechaPago,
             CobroNeto = cobroNeto,
             Dias = dias,
-            PorcentajeComision = PorcentajeComisionProvisional,
-            TotalComision = Math.Round(cobroNeto * PorcentajeComisionProvisional, 2, MidpointRounding.AwayFromZero),
+            PorcentajeComision = porcentajeComision,
+            TotalComision = Math.Round(cobroNeto * porcentajeComision, 2, MidpointRounding.AwayFromZero),
             Retenciones = pago.Retenciones
         };
     }
