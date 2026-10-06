@@ -106,9 +106,13 @@ public class ExportadorPlantillaExcelService : IExportadorPlantillaExcelService
         var ultimaFilaDatos = fila - 1;
         worksheet.Range(primeraFilaDatos, 4, ultimaFilaDatos, 4).Style.DateFormat.Format = "dd/mm/yy";
         worksheet.Range(primeraFilaDatos, 9, ultimaFilaDatos, 9).Style.DateFormat.Format = "dd/mm/yy";
-        worksheet.Range(primeraFilaDatos, 5, ultimaFilaDatos, 10).Style.NumberFormat.Format = "$#,##0.00";
+        foreach (var columnaMonetaria in new[] { 5, 6, 7, 8, 10, 13 })
+        {
+            worksheet.Range(primeraFilaDatos, columnaMonetaria, ultimaFilaDatos, columnaMonetaria)
+                .Style.NumberFormat.Format = "$#,##0.00";
+        }
+
         worksheet.Range(primeraFilaDatos, 12, ultimaFilaDatos, 12).Style.NumberFormat.Format = "0.0%";
-        worksheet.Range(primeraFilaDatos, 13, ultimaFilaDatos, 13).Style.NumberFormat.Format = "$#,##0.00";
         worksheet.Range(primeraFilaDatos, 1, ultimaFilaDatos, ultimaColumna).Style.Border.BottomBorder = XLBorderStyleValues.Hair;
 
         var filaTotal = ultimaFilaDatos + 1;
