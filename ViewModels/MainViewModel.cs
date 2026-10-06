@@ -2,51 +2,78 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows.Input;
 using Microsoft.Win32;
-using osakaautomate.Dtos;
 using osakaautomate.Infrastructure;
-using osakaautomate.Models;
+using osakaautomate.Dtos;
 using osakaautomate.Services;
 
 namespace osakaautomate.ViewModels;
 
 public class MainViewModel : BaseViewModel
 {
-    private readonly ILectorPagosExcelService _lectorPagosExcelService;
-    private readonly IOCRService _ocrService;
+    private readonly ILectorFacturasCsvService _lectorFacturasCsvService;
+    private readonly ILectorPagosCsvService _lectorPagosCsvService;
     private readonly IMotorCalculoService _motorCalculoService;
     private readonly IExportadorPlantillaExcelService _exportadorPlantillaExcelService;
+    private readonly AsyncRelayCommand _cargarFacturasCommand;
     private readonly AsyncRelayCommand _cargarPagosCommand;
-    private readonly AsyncRelayCommand _cargarPdfsCommand;
     private readonly RelayCommand _calcularCommand;
     private readonly AsyncRelayCommand _exportarExcelCommand;
-    private List<string> _facturasPagadas = [];
-    private List<FacturaDto> _facturasLeidas = [];
+    private List<FacturaCsvDto> _facturas = [];
+    private List<PagoCsvDto> _pagos = [];
     private bool _isBusy;
     private string _estado = "Listo";
+    private string _archivoFacturas = "Sin cargar";
+    private string _archivoPagos = "Sin cargar";
+    private decimal _totalCobroNeto;
+    private decimal _totalComisiones;
 
     public MainViewModel(
-        ILectorPagosExcelService lectorPagosExcelService,
-        IOCRService ocrService,
+        ILectorFacturasCsvService lectorFacturasCsvService,
+        ILectorPagosCsvService lectorPagosCsvService,
         IMotorCalculoService motorCalculoService,
         IExportadorPlantillaExcelService exportadorPlantillaExcelService)
     {
-        _lectorPagosExcelService = lectorPagosExcelService;
-        _ocrService = ocrService;
+        _lectorFacturasCsvService = lectorFacturasCsvService;
+        _lectorPagosCsvService = lectorPagosCsvService;
         _motorCalculoService = motorCalculoService;
         _exportadorPlantillaExcelService = exportadorPlantillaExcelService;
 
-        _cargarPagosCommand = new AsyncRelayCommand(CargarPagosAsync);
-        _cargarPdfsCommand = new AsyncRelayCommand(CargarPdfsAsync);
+        _cargarFacturasCommand = new AsyncRelayCommand(CargarFacturasAsync, () => !IsBusy);
+        _cargarPagosCommand = new AsyncRelayCommand(CargarPagosAsync, () => !IsBusy);
         _calcularCommand = new RelayCommand(Calcular, PuedeCalcular);
         _exportarExcelCommand = new AsyncRelayCommand(ExportarExcelAsync, PuedeExportar);
 
+        CargarFacturasCommand = _cargarFacturasCommand;
         CargarPagosCommand = _cargarPagosCommand;
-        CargarPdfsCommand = _cargarPdfsCommand;
         CalcularCommand = _calcularCommand;
         ExportarExcelCommand = _exportarExcelCommand;
     }
 
-    public ObservableCollection<FacturaProcesada> FacturasProcesadas { get; } = [];
+    public ObservableCollection<ComisionReporteDto> Comisiones { get; } = [];
+
+    public string ArchivoFacturas
+    {
+        get => _archivoFacturas;
+        private set => SetProperty(ref _archivoFacturas, value);
+    }
+
+    public string ArchivoPagos
+    {
+        get => _archivoPagos;
+        private set => SetProperty(ref _archivoPagos, value);
+    }
+
+    public decimal TotalCobroNeto
+    {
+        get => _totalCobroNeto;
+        private set => SetProperty(ref _totalCobroNeto, value);
+    }
+
+    public decimal TotalComisiones
+    {
+        get => _totalComisiones;
+        private set => SetProperty(ref _totalComisiones, value);
+    }
 
     public bool IsBusy
     {
@@ -66,17 +93,17 @@ public class MainViewModel : BaseViewModel
         private set => SetProperty(ref _estado, value);
     }
 
+    public ICommand CargarFacturasCommand { get; }
     public ICommand CargarPagosCommand { get; }
-    public ICommand CargarPdfsCommand { get; }
     public ICommand CalcularCommand { get; }
     public ICommand ExportarExcelCommand { get; }
 
-    private async Task CargarPagosAsync()
+    private async Task CargarFacturasAsync()
     {
         var dialogo = new OpenFileDialog
         {
-            Filter = "Archivos de Excel|*.xlsx;*.xlsm",
-            Title = "Seleccionar reporte de pagos"
+            Filter = "Archivo CSV|*.csv",
+            Title = "Seleccionar exportación de facturas"
         };
 
         if (dialogo.ShowDialog() != true)
@@ -85,16 +112,16 @@ public class MainViewModel : BaseViewModel
         }
 
         IsBusy = true;
-
         try
         {
-            _facturasPagadas = await Task.Run(() => _lectorPagosExcelService.LeerFacturasPagadas(dialogo.FileName));
-            Estado = $"Se cargaron {_facturasPagadas.Count} facturas pagadas.";
-            ActualizarComandos();
+            _facturas = await Task.Run(() => _lectorFacturasCsvService.LeerFacturas(dialogo.FileName));
+            ArchivoFacturas = Path.GetFileName(dialogo.FileName);
+            LimpiarResultados();
+            Estado = $"Facturas cargadas: {_facturas.Count}.";
         }
         catch (Exception exception)
         {
-            Estado = exception.Message;
+            Estado = $"Error al leer facturas: {exception.Message}";
         }
         finally
         {
@@ -102,11 +129,12 @@ public class MainViewModel : BaseViewModel
         }
     }
 
-    private async Task CargarPdfsAsync()
+    private async Task CargarPagosAsync()
     {
-        var dialogo = new OpenFolderDialog
+        var dialogo = new OpenFileDialog
         {
-            Title = "Seleccionar carpeta de facturas PDF"
+            Filter = "Archivo CSV|*.csv",
+            Title = "Seleccionar exportación de pagos de clientes"
         };
 
         if (dialogo.ShowDialog() != true)
@@ -118,16 +146,14 @@ public class MainViewModel : BaseViewModel
 
         try
         {
-            var archivosPdf = Directory.EnumerateFiles(dialogo.FolderName, "*.pdf", SearchOption.TopDirectoryOnly).ToList();
-            _facturasLeidas = (await Task.WhenAll(archivosPdf.Select(archivo => _ocrService.ExtraerFacturaAsync(archivo))))
-                .Where(factura => !string.IsNullOrWhiteSpace(factura.NumeroFactura))
-                .ToList();
-            Estado = $"Se procesaron {_facturasLeidas.Count} facturas PDF.";
-            ActualizarComandos();
+            _pagos = await Task.Run(() => _lectorPagosCsvService.LeerPagos(dialogo.FileName));
+            ArchivoPagos = Path.GetFileName(dialogo.FileName);
+            LimpiarResultados();
+            Estado = $"Movimientos de pago cargados: {_pagos.Count}.";
         }
         catch (Exception exception)
         {
-            Estado = exception.Message;
+            Estado = $"Error al leer pagos: {exception.Message}";
         }
         finally
         {
@@ -141,20 +167,21 @@ public class MainViewModel : BaseViewModel
 
         try
         {
-            var resultados = _motorCalculoService.CalcularComisiones(_facturasPagadas, _facturasLeidas);
-            FacturasProcesadas.Clear();
+            var resultados = _motorCalculoService.CalcularComisiones(_facturas, _pagos).ToList();
+            Comisiones.Clear();
 
             foreach (var factura in resultados)
             {
-                FacturasProcesadas.Add(factura);
+                Comisiones.Add(factura);
             }
 
-            Estado = $"Se calcularon {FacturasProcesadas.Count} comisiones.";
-            ActualizarComandos();
+            TotalCobroNeto = Comisiones.Sum(comision => comision.CobroNeto);
+            TotalComisiones = Comisiones.Sum(comision => comision.TotalComision);
+            Estado = $"Comisiones calculadas: {Comisiones.Count}.";
         }
         catch (Exception exception)
         {
-            Estado = exception.Message;
+            Estado = $"Error al calcular: {exception.Message}";
         }
         finally
         {
@@ -164,10 +191,14 @@ public class MainViewModel : BaseViewModel
 
     private async Task ExportarExcelAsync()
     {
-        var dialogo = new OpenFileDialog
+        var dialogo = new SaveFileDialog
         {
-            Filter = "Archivos de Excel|*.xlsx;*.xlsm",
-            Title = "Seleccionar plantilla de comisiones"
+            Filter = "Libro de Excel|*.xlsx",
+            Title = "Guardar reporte de comisiones",
+            FileName = $"Comisiones_{DateTime.Today:yyyy_MM}.xlsx",
+            DefaultExt = ".xlsx",
+            AddExtension = true,
+            OverwritePrompt = true
         };
 
         if (dialogo.ShowDialog() != true)
@@ -180,13 +211,12 @@ public class MainViewModel : BaseViewModel
         try
         {
             var rutaSalida = await Task.Run(() => _exportadorPlantillaExcelService.ExportarComisiones(
-                FacturasProcesadas.ToList(),
-                dialogo.FileName));
+                Comisiones.ToList(), dialogo.FileName));
             Estado = $"Archivo generado: {rutaSalida}";
         }
         catch (Exception exception)
         {
-            Estado = exception.Message;
+            Estado = $"Error al exportar: {exception.Message}";
         }
         finally
         {
@@ -196,16 +226,26 @@ public class MainViewModel : BaseViewModel
 
     private bool PuedeCalcular()
     {
-        return _facturasPagadas.Count > 0 && _facturasLeidas.Count > 0 && !IsBusy;
+        return _facturas.Count > 0 && _pagos.Count > 0 && !IsBusy;
     }
 
     private bool PuedeExportar()
     {
-        return FacturasProcesadas.Count > 0 && !IsBusy;
+        return Comisiones.Count > 0 && !IsBusy;
+    }
+
+    private void LimpiarResultados()
+    {
+        Comisiones.Clear();
+        TotalCobroNeto = 0m;
+        TotalComisiones = 0m;
+        ActualizarComandos();
     }
 
     private void ActualizarComandos()
     {
+        _cargarFacturasCommand.NotifyCanExecuteChanged();
+        _cargarPagosCommand.NotifyCanExecuteChanged();
         _calcularCommand.NotifyCanExecuteChanged();
         _exportarExcelCommand.NotifyCanExecuteChanged();
     }

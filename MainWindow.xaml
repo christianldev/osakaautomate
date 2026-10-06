@@ -42,18 +42,20 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <Button Style="{StaticResource ActionButton}" Command="{Binding CargarPagosCommand}">
+                    <Button Style="{StaticResource ActionButton}" Command="{Binding CargarFacturasCommand}">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="FileExcel" Width="20" Height="20" Margin="0,0,12,0" />
-                            <TextBlock Text="Cargar pagos" VerticalAlignment="Center" />
+                            <TextBlock Text="Cargar facturas CSV" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource ActionButton}" Command="{Binding CargarPdfsCommand}">
+                    <TextBlock Text="{Binding ArchivoFacturas}" Foreground="#FFBBD0CD" FontSize="11" TextTrimming="CharacterEllipsis" Margin="2,-5,0,12" />
+                    <Button Style="{StaticResource ActionButton}" Command="{Binding CargarPagosCommand}">
                         <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="FolderOpen" Width="20" Height="20" Margin="0,0,12,0" />
-                            <TextBlock Text="Cargar facturas" VerticalAlignment="Center" />
+                            <materialDesign:PackIcon Kind="CashMultiple" Width="20" Height="20" Margin="0,0,12,0" />
+                            <TextBlock Text="Cargar pagos CSV" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
+                    <TextBlock Text="{Binding ArchivoPagos}" Foreground="#FFBBD0CD" FontSize="11" TextTrimming="CharacterEllipsis" Margin="2,-5,0,12" />
                     <Button Style="{StaticResource ActionButton}" Command="{Binding CalcularCommand}">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="CalculatorVariant" Width="20" Height="20" Margin="0,0,12,0" />
@@ -91,24 +93,45 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel>
                     <TextBlock Text="Comisiones calculadas" FontSize="25" FontWeight="SemiBold" Foreground="#FF1E3433" />
-                    <TextBlock Text="Resultados de facturas pagadas" FontSize="13" Foreground="#FF5B7070" Margin="0,5,0,0" />
+                    <TextBlock Text="Recuperación y comisiones por factura" FontSize="13" Foreground="#FF5B7070" Margin="0,5,0,0" />
                 </StackPanel>
-                <Border Grid.Column="1" Background="#FFDCECE8" CornerRadius="5" Padding="12,7" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding FacturasProcesadas.Count, StringFormat={}{0} registros}" Foreground="#FF206457" FontWeight="SemiBold" />
-                </Border>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Margin="0,0,22,0">
+                        <TextBlock Text="{Binding Comisiones.Count}" Foreground="#FF206457" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                        <TextBlock Text="FACTURAS" Foreground="#FF5B7070" FontSize="10" HorizontalAlignment="Right" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,22,0">
+                        <TextBlock Text="{Binding TotalCobroNeto, StringFormat={}{0:C2}}" Foreground="#FF206457" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                        <TextBlock Text="COBRO NETO" Foreground="#FF5B7070" FontSize="10" HorizontalAlignment="Right" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="{Binding TotalComisiones, StringFormat={}{0:C2}}" Foreground="#FFB64D36" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                        <TextBlock Text="COMISIONES" Foreground="#FF5B7070" FontSize="10" HorizontalAlignment="Right" />
+                    </StackPanel>
+                </StackPanel>
             </Grid>
 
             <Border Grid.Row="2" Background="White" BorderBrush="#FFD9E3E3" BorderThickness="1" CornerRadius="6">
-                <DataGrid ItemsSource="{Binding FacturasProcesadas}" IsReadOnly="True" AutoGenerateColumns="False"
+                                <DataGrid ItemsSource="{Binding Comisiones}" IsReadOnly="True" AutoGenerateColumns="False"
                           CanUserAddRows="False" CanUserDeleteRows="False" CanUserReorderColumns="False"
                           GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#FFE7EEEE"
-                          BorderThickness="0" RowHeight="46" HeadersVisibility="Column">
+                                                    BorderThickness="0" RowHeight="42" HeadersVisibility="Column"
+                                                    EnableRowVirtualization="True" ScrollViewer.HorizontalScrollBarVisibility="Auto">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Factura" Binding="{Binding NumeroFactura}" Width="1.1*" />
-                        <DataGridTextColumn Header="Vendedor" Binding="{Binding Vendedor.Nombre}" Width="2*" />
-                        <DataGridTextColumn Header="Subtotal" Binding="{Binding Subtotal, StringFormat={}{0:C2}}" Width="1*" />
-                        <DataGridTextColumn Header="Comisión" Binding="{Binding MontoComision, StringFormat={}{0:C2}}" Width="1*" />
-                        <DataGridTextColumn Header="Estado" Binding="{Binding Estado}" Width="0.9*" />
+                                                <DataGridTextColumn Header="Cliente" Binding="{Binding Cliente}" Width="220" />
+                                                <DataGridTextColumn Header="Sucursal" Binding="{Binding Sucursal}" Width="105" />
+                                                <DataGridTextColumn Header="Vendedor" Binding="{Binding Vendedor}" Width="180" />
+                                                <DataGridTextColumn Header="Factura" Binding="{Binding NumeroFactura}" Width="155" />
+                                                <DataGridTextColumn Header="F. factura" Binding="{Binding FechaFactura, StringFormat={}{0:dd/MM/yy}}" Width="88" />
+                                                <DataGridTextColumn Header="Venta bruta" Binding="{Binding VentaBruta, StringFormat={}{0:C2}}" Width="105" />
+                                                <DataGridTextColumn Header="Descuento" Binding="{Binding Descuento, StringFormat={}{0:C2}}" Width="95" />
+                                                <DataGridTextColumn Header="Total cobrado" Binding="{Binding TotalCobrado, StringFormat={}{0:C2}}" Width="110" />
+                                                <DataGridTextColumn Header="IVA" Binding="{Binding Iva, StringFormat={}{0:C2}}" Width="90" />
+                                                <DataGridTextColumn Header="F. pago" Binding="{Binding FechaPago, StringFormat={}{0:dd/MM/yy}}" Width="88" />
+                                                <DataGridTextColumn Header="Cobro neto" Binding="{Binding CobroNeto, StringFormat={}{0:C2}}" Width="105" />
+                                                <DataGridTextColumn Header="Días" Binding="{Binding Dias}" Width="55" />
+                                                <DataGridTextColumn Header="Comisión %" Binding="{Binding PorcentajeComision, StringFormat={}{0:P1}}" Width="82" />
+                                                <DataGridTextColumn Header="Total comisión" Binding="{Binding TotalComision, StringFormat={}{0:C2}}" Width="115" />
                     </DataGrid.Columns>
                 </DataGrid>
             </Border>
