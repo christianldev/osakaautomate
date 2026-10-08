@@ -66,4 +66,4 @@ packages/
 *.db-wal
 *.mdf
 *.ldf
-*.ndf
+*.ndfshared/chat.json
