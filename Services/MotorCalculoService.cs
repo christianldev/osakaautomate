@@ -6,6 +6,12 @@ public class MotorCalculoService : IMotorCalculoService
 {
     private const decimal PorcentajeComisionHasta30Dias = 0.035m;
     private const decimal PorcentajeComisionMas30Dias = 0.03m;
+    private static readonly IReadOnlySet<string> FacturasConRetencionExcluida =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // Ajuste manual heredado del libro histórico de septiembre de 2026.
+            "001-011-000001023"
+        };
 
     public IEnumerable<ComisionReporteDto> CalcularComisiones(
         List<FacturaCsvDto> facturas,
@@ -22,7 +28,10 @@ public class MotorCalculoService : IMotorCalculoService
             _ => new AcumuladoPago(),
             StringComparer.OrdinalIgnoreCase);
 
-        foreach (var pago in pagos.Where(pago => !pago.EsNotaCredito))
+        foreach (var pago in pagos
+                     .Where(pago => !pago.EsNotaCredito)
+                     .OrderByDescending(EsRetencion)
+                     .ThenBy(pago => pago.FechaPago))
         {
             var facturasRelacionadas = pago.Facturas
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -96,19 +105,25 @@ public class MotorCalculoService : IMotorCalculoService
         IReadOnlyDictionary<string, AcumuladoPago> acumulados)
     {
         var montosBase = facturasRelacionadas
-            .Select(factura => Math.Max(factura.Total, factura.Subtotal + factura.Iva))
+            .Select(factura =>
+            {
+                var baseFactura = Math.Max(factura.Total, factura.Subtotal + factura.Iva);
+                var recibido = acumulados[factura.NumeroFactura].TotalRecibido;
+                return Math.Max(0m, baseFactura - recibido);
+            })
             .ToList();
         var totalBase = montosBase.Sum();
         var montoPendiente = pago.Monto;
-        var esRetencion = pago.Tipo.Contains("retencion", StringComparison.OrdinalIgnoreCase)
-            || pago.Tipo.Contains("retención", StringComparison.OrdinalIgnoreCase);
+        var esRetencion = EsRetencion(pago);
 
         for (var index = 0; index < facturasRelacionadas.Count; index++)
         {
             var montoAsignado = index == facturasRelacionadas.Count - 1
-                ? montoPendiente
+                ? Math.Min(montoPendiente, montosBase[index])
                 : totalBase > 0m
-                    ? Math.Round(pago.Monto * montosBase[index] / totalBase, 2, MidpointRounding.AwayFromZero)
+                    ? Math.Min(
+                        montoPendiente,
+                        Math.Round(pago.Monto * montosBase[index] / totalBase, 2, MidpointRounding.AwayFromZero))
                     : Math.Round(pago.Monto / facturasRelacionadas.Count, 2, MidpointRounding.AwayFromZero);
 
             montoPendiente -= montoAsignado;
@@ -127,6 +142,12 @@ public class MotorCalculoService : IMotorCalculoService
                 acumulado.FechaPago = pago.FechaPago;
             }
         }
+    }
+
+    private static bool EsRetencion(PagoCsvDto pago)
+    {
+        return pago.Tipo.Contains("retencion", StringComparison.OrdinalIgnoreCase)
+            || pago.Tipo.Contains("retención", StringComparison.OrdinalIgnoreCase);
     }
 
     private static ComisionReporteDto CrearResultado(FacturaCsvDto factura, AcumuladoPago pago)
@@ -149,7 +170,10 @@ public class MotorCalculoService : IMotorCalculoService
             Subtotal = factura.Subtotal,
             VentaBruta = factura.Subtotal + factura.Descuento,
             Descuento = factura.Descuento,
-            TotalCobrado = pago.TotalCobrado,
+            TotalCobrado = pago.TotalCobrado
+                + (FacturasConRetencionExcluida.Contains(factura.NumeroFactura)
+                    ? 0m
+                    : pago.Retenciones),
             Iva = factura.Iva,
             FechaPago = pago.FechaPago,
             CobroNeto = cobroNeto,

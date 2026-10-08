@@ -134,7 +134,7 @@ internal static class TablaCsv
 internal static class NormalizadorNumeroFactura
 {
     private static readonly Regex ReferenciaRegex = new(
-        @"(?<!\d)(?<establecimiento>\d{3})-(?<punto>\d{3})-(?<secuencial>\d{1,9}(?:/\d{1,9})*)(?!\d)",
+        @"(?<!\d)(?<establecimiento>\d{3})-(?<punto>\d{3})-(?<secuencial>\d{1,12}(?:/\d{1,12})*)(?!\d)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public static string? Normalizar(string valor)
@@ -170,6 +170,17 @@ internal static class NormalizadorNumeroFactura
 
     private static string CrearClave(string establecimiento, string punto, string secuencial)
     {
-        return $"{establecimiento}-{punto}-{secuencial.PadLeft(9, '0')}";
+        var secuencialLimpio = secuencial.TrimStart('0');
+        if (string.IsNullOrEmpty(secuencialLimpio))
+        {
+            secuencialLimpio = "0";
+        }
+
+        if (secuencialLimpio.Length > 9)
+        {
+            secuencialLimpio = secuencialLimpio[^9..];
+        }
+
+        return $"{establecimiento}-{punto}-{secuencialLimpio.PadLeft(9, '0')}";
     }
 }
